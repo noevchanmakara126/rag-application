@@ -1,0 +1,71 @@
+# Production stack: backend + frontend only.
+#
+# There is no `db` service here on purpose — DATABASE_URL in .env.production
+# points at the pgvector instance you installed on the server. A commented
+# service is included at the bottom for anyone who wants it in-stack instead.
+#   make prod
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to your pgvector instance}
+      LLM_BASE_URL: ${LLM_BASE_URL:?set LLM_BASE_URL}
+      LLM_MODEL: ${LLM_MODEL:-qwen3:8b}
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:?set EMBEDDING_BASE_URL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+      # compose only forwards what it names, so every tunable has to be listed
+      # here or setting it in .env.production silently does nothing.
+      EMBEDDING_DOCUMENT_PREFIX: "${EMBEDDING_DOCUMENT_PREFIX-search_document: }"
+      EMBEDDING_QUERY_PREFIX: "${EMBEDDING_QUERY_PREFIX-search_query: }"
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+      CHUNK_SIZE: ${CHUNK_SIZE:-1000}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-150}
+      MIN_SCORE: ${MIN_SCORE:-0.55}
+      TOP_K: ${TOP_K:-5}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.2}
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the browser-facing origin}
+      ENVIRONMENT: production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    depends_on:
+      - backend
+
+# Uncomment to run pgvector inside the stack instead of pointing at your own,
+# and set DATABASE_URL=postgresql+asyncpg://rag:...@db:5432/rag
+#
+#   db:
+#     image: pgvector/pgvector:pg17
+#     restart: unless-stopped
+#     environment:
+#       POSTGRES_USER: ${POSTGRES_USER:-rag}
+#       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+#       POSTGRES_DB: ${POSTGRES_DB:-rag}
+#     volumes:
+#       - db_data:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag}"]
+#       interval: 5s
+#       retries: 10
+#
+# volumes:
+#   db_data:
