@@ -102,7 +102,7 @@ Everything else has a working default. The ones you are most likely to touch:
 
 | Variable                         | Default             |                                                      |
 | -------------------------------- | ------------------- | ---------------------------------------------------- |
-| `LLM_MODEL`                      | `qwen3:8b`          | Must exist on the LLM server                         |
+| `LLM_MODEL`                      | `qwen3:8b`          | Default only — switchable in the UI, see §4           |
 | `EMBEDDING_MODEL`                | `nomic-embed-text`  |                                                      |
 | `EMBEDDING_DIM`                  | `768`               | **Must match the model's real output size** — see §4 |
 | `EMBEDDING_DOCUMENT_PREFIX`      | `search_document: ` | See §5                                               |
@@ -169,6 +169,20 @@ curl -s -X POST http://SERVER:8000/api/v1/search \
 curl -sN -X POST http://SERVER:8000/api/v1/chat/stream \
   -H 'Content-Type: application/json' -d '{"content":"what is the deploy check phrase?"}'
 ```
+
+Check which models the picker will offer — this is the LLM server's own
+`/v1/models` list, minus `EMBEDDING_MODEL`:
+
+```bash
+curl -s http://SERVER:8000/api/v1/chat/models | python3 -m json.tool
+# {"models": ["llama3.2:3b", "qwen3:8b"], "default": "qwen3:8b"}
+```
+
+`LLM_MODEL` is only the entry the chat starts on; the picker next to *Passages
+retrieved* switches model per question. A server that is down, or one without a
+`/models` route, still leaves `LLM_MODEL` selectable — so an empty-looking list
+here means the LLM server, not the app. `ollama pull` a model and it appears on
+the next page load, with no redeploy.
 
 Finally open `https://your-domain` and ask the same question in the UI.
 

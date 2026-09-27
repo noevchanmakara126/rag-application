@@ -118,6 +118,9 @@ export type Source = {
   score: number
 }
 
+/** The generation models this deployment can answer with. */
+export type ChatModels = { models: string[]; default: string }
+
 export type Health = {
   status: string
   environment: string
@@ -136,6 +139,8 @@ export type Health = {
 // ── Endpoints ────────────────────────────────────────────────────────────
 
 export const getHealth = () => apiFetch<Health>("/health")
+
+export const getChatModels = () => apiFetch<ChatModels>("/api/v1/chat/models")
 
 export const listDocuments = () => apiFetch<DocumentSummary[]>("/api/v1/documents")
 

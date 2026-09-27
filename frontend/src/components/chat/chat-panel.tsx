@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react"
 import type { Source } from "@/lib/api"
 import { type ChatMessage, MessageBubble } from "@/components/chat/message-bubble"
 import { EmptyState } from "@/components/chat/empty-state"
+import { ModelPicker } from "@/components/chat/model-picker"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { readSSE } from "@/lib/stream"
@@ -14,13 +15,22 @@ import { cn, messageId } from "@/lib/utils"
 
 const TOP_K_CHOICES = [3, 5, 8]
 
-export function ChatPanel() {
+export function ChatPanel({
+  models,
+  defaultModel,
+}: {
+  /** From the LLM server's own /models. Empty means the picker is not shown. */
+  models: string[]
+  /** LLM_MODEL on the backend; "" when the model list could not be read. */
+  defaultModel: string
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState("")
   const [streamingText, setStreamingText] = useState("")
   const [sources, setSources] = useState<Source[]>([])
   const [phase, setPhase] = useState<"idle" | "retrieving" | "generating">("idle")
   const [topK, setTopK] = useState(5)
+  const [model, setModel] = useState(defaultModel)
 
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -73,7 +83,7 @@ export function ChatPanel() {
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, history, top_k: topK }),
+        body: JSON.stringify({ content, history, top_k: topK, model: model || undefined }),
         signal: controller.signal,
       })
 
@@ -217,7 +227,17 @@ export function ChatPanel() {
               {choice}
             </button>
           ))}
-          {busy && <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />}
+          <div className="ml-auto flex items-center gap-2">
+            {busy && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+            {models.length > 0 && (
+              <ModelPicker
+                models={models}
+                value={model}
+                defaultModel={defaultModel}
+                onChange={setModel}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

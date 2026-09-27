@@ -7,10 +7,16 @@ from fastapi.responses import StreamingResponse
 
 from app.core.config import settings
 from app.core.deps import DbSession
-from app.schemas.chat import ChatRequest
+from app.schemas.chat import ChatModels, ChatRequest
 from app.schemas.search import Source
 from app.services.embeddings import EmbeddingError
-from app.services.llm import NO_CONTEXT_REPLY, LLMError, stream_chat
+from app.services.llm import (
+    NO_CONTEXT_REPLY,
+    LLMError,
+    list_models,
+    stream_chat,
+    usable_chat_models,
+)
 from app.services.retrieval import build_context_prompt, retrieve
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -61,7 +67,8 @@ async def chat_stream(payload: ChatRequest, db: DbSession) -> StreamingResponse:
 
         produced = False
         try:
-            async for delta in stream_chat([*history, {"role": "user", "content": question}]):
+            messages = [*history, {"role": "user", "content": question}]
+            async for delta in stream_chat(messages, payload.model):
                 produced = True
                 yield _sse({"delta": delta})
         except LLMError as exc:
@@ -86,3 +93,22 @@ async def chat_stream(payload: ChatRequest, db: DbSession) -> StreamingResponse:
             "X-Accel-Buffering": "no",  # stops nginx from buffering the stream
         },
     )
+
+
+@router.get("/models")
+async def chat_models() -> ChatModels:
+    """Generation models this deployment can answer with.
+
+    Deliberately cannot fail. An LLM server that is down, or one that does not
+    implement `/models` at all, still leaves `LLM_MODEL` selectable -- which is
+    exactly the behaviour this app had before the model became switchable. The
+    outage is already reported by `/health`, so it is not repeated here.
+    """
+    try:
+        available = usable_chat_models(await list_models())
+    except LLMError:
+        available = []
+
+    # The configured default is always offered, even when the server did not
+    # list it: it is the one value the operator has explicitly asked for.
+    return ChatModels(models=sorted({*available, settings.LLM_MODEL}), default=settings.LLM_MODEL)

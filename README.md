@@ -108,7 +108,8 @@ rather than chips pointing at nothing.
 | `POST` | `/api/v1/documents/url` | `{url}` |
 | `DELETE` | `/api/v1/documents/{id}` | Cascades to chunks |
 | `POST` | `/api/v1/search` | `{query, top_k?}` → scored chunks, **no LLM** |
-| `POST` | `/api/v1/chat/stream` | `{content, history?, top_k?}` → SSE |
+| `POST` | `/api/v1/chat/stream` | `{content, history?, top_k?, model?}` → SSE |
+| `GET` | `/api/v1/chat/models` | Generation models on offer → `{models, default}` |
 
 `/api/v1/search` exists so retrieval can be judged on its own: when an answer
 looks wrong, it tells you whether the search or the model is at fault. It is
@@ -128,7 +129,7 @@ Everything lives in `.env.development` / `.env.production`, copied from
 | `DATABASE_URL` | `…@localhost:5433/rag` | Must be Postgres with pgvector. There is no SQLite fallback |
 | `POSTGRES_PORT` | `5433` | Host mapping for the dev `db` container; off 5432 to avoid colliding with a local Postgres |
 | `LLM_BASE_URL` | `http://localhost:11434/v1` | OpenAI-compatible base, including `/v1` |
-| `LLM_MODEL` | `qwen3:8b` | |
+| `LLM_MODEL` | `qwen3:8b` | The default the picker starts on; any model the server lists can be chosen per question |
 | `LLM_API_KEY` | *(empty)* | Sent as Bearer only when set |
 | `EMBEDDING_BASE_URL` | `http://localhost:11434/v1` | May differ from the LLM host |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | |

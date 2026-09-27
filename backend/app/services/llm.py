@@ -56,6 +56,57 @@ async def ping() -> bool:
         return False
 
 
+def parse_model_ids(payload: object) -> list[str]:
+    """Pull model ids out of an OpenAI-shaped `/models` body.
+
+    Kept separate from the request so the tolerance is testable: Ollama, vLLM,
+    TGI and LM Studio all answer `{"data": [{"id": ...}]}`, but a few servers
+    return a bare list, and any of them may include entries without an id.
+    """
+    data = payload.get("data") if isinstance(payload, dict) else payload
+    if not isinstance(data, list):
+        return []
+
+    ids = []
+    for entry in data:
+        model_id = entry.get("id") if isinstance(entry, dict) else entry
+        if isinstance(model_id, str) and model_id.strip():
+            ids.append(model_id.strip())
+    return ids
+
+
+def usable_chat_models(ids: list[str]) -> list[str]:
+    """The subset of `ids` worth offering as a generation model.
+
+    Ollama serves generation and embedding models from one `/models` list, and
+    choosing an embedding model to answer with fails upstream in a way that
+    reads like a broken app. Only the configured embedding model can be
+    identified for certain, so that is the one dropped.
+    """
+    return sorted({i for i in ids if i != settings.EMBEDDING_MODEL.strip()})
+
+
+async def list_models() -> list[str]:
+    """Model ids the generation server currently offers.
+
+    Raises `LLMError` rather than returning empty: "the server has no models"
+    and "the server could not be asked" need different handling by the caller.
+    """
+    try:
+        async with _client(5.0) as client:
+            response = await client.get("/models")
+    except httpx.HTTPError as exc:
+        raise LLMError(f"Could not reach the LLM at {settings.LLM_BASE_URL}") from exc
+
+    if response.status_code >= 400:
+        raise LLMError(_readable_error(response.status_code, response.text, settings.LLM_MODEL))
+
+    try:
+        return parse_model_ids(response.json())
+    except ValueError as exc:
+        raise LLMError(f"{settings.LLM_BASE_URL}/models did not return JSON.") from exc
+
+
 async def stream_chat(messages: list[dict], model: str | None = None) -> AsyncGenerator[str, None]:
     """Yield assistant text deltas from an OpenAI-compatible /chat/completions.
 
