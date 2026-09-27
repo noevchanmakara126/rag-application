@@ -7,20 +7,20 @@ do it in. Everything below assumes you are deploying this repo as-is.
 
 ## 1. What you must install
 
-| | Why | Check it works |
-|---|---|---|
-| **Docker + Compose v2** | Both services are containers | `docker compose version` |
-| **Postgres 17 with pgvector** | The vector store. **Not optional** — there is no SQLite fallback | `psql -c '\dx'` lists `vector` |
-| **An OpenAI-compatible LLM server** | `/v1/chat/completions` with streaming | `curl $LLM_BASE_URL/models` |
-| **An OpenAI-compatible embedding server** | `/v1/embeddings` | see §4 |
-| **git** | To clone this repo | |
+|                                           | Why                                                              | Check it works                 |
+| ----------------------------------------- | ---------------------------------------------------------------- | ------------------------------ |
+| **Docker + Compose v2**                   | Both services are containers                                     | `docker compose version`       |
+| **Postgres 17 with pgvector**             | The vector store. **Not optional** — there is no SQLite fallback | `psql -c '\dx'` lists `vector` |
+| **An OpenAI-compatible LLM server**       | `/v1/chat/completions` with streaming                            | `curl $LLM_BASE_URL/models`    |
+| **An OpenAI-compatible embedding server** | `/v1/embeddings`                                                 | see §4                         |
+| **git**                                   | To clone this repo                                               |                                |
 
 The LLM and embedding servers may be the same process (Ollama serves both) or
 two different hosts — they are configured independently.
 
 ### pgvector
 
-The extension must be *installed* on the server; the app creates it in the
+The extension must be _installed_ on the server; the app creates it in the
 database itself during migration. On Debian/Ubuntu with PGDG:
 
 ```bash
@@ -56,12 +56,12 @@ ollama pull nomic-embed-text    # embeddings, 768-dim
 
 ## 2. Network and ports
 
-| Port | Who opens it | Notes |
-|---|---|---|
-| `3000` | frontend container | The only one a browser needs. Put a reverse proxy in front for TLS |
-| `8000` | backend container | Should **not** be public — the frontend reaches it over the compose network as `http://backend:8000` |
-| `5432` | your Postgres | Must be reachable *from the backend container* |
-| LLM / embedding ports | your model servers | Must be reachable *from the backend container* |
+| Port                  | Who opens it       | Notes                                                                                                |
+| --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `3000`                | frontend container | The only one a browser needs. Put a reverse proxy in front for TLS                                   |
+| `8000`                | backend container  | Should **not** be public — the frontend reaches it over the compose network as `http://backend:8000` |
+| `5432`                | your Postgres      | Must be reachable _from the backend container_                                                       |
+| LLM / embedding ports | your model servers | Must be reachable _from the backend container_                                                       |
 
 Three things that bite here:
 
@@ -88,30 +88,30 @@ $EDITOR .env.production
 Compose **refuses to start** until these three are set — there is no default,
 on purpose, because a wrong one fails in a confusing way later:
 
-| Variable | Example |
-|---|---|
-| `DATABASE_URL` | `postgresql+asyncpg://rag:PASSWORD@host.docker.internal:5432/rag` |
-| `LLM_BASE_URL` | `http://host.docker.internal:11434/v1` |
-| `EMBEDDING_BASE_URL` | `http://host.docker.internal:11434/v1` |
-| `CORS_ORIGINS` | `https://rag.example.com` |
+| Variable             | Example                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| `DATABASE_URL`       | `postgresql+asyncpg://rag:PASSWORD@host.docker.internal:5432/rag` |
+| `LLM_BASE_URL`       | `http://host.docker.internal:11434/v1`                            |
+| `EMBEDDING_BASE_URL` | `http://host.docker.internal:11434/v1`                            |
+| `CORS_ORIGINS`       | `https://rag.example.com`                                         |
 
 Note the driver prefix: `postgresql+asyncpg://`, not plain `postgresql://`.
 And `*_BASE_URL` must include the `/v1` suffix.
 
 Everything else has a working default. The ones you are most likely to touch:
 
-| Variable | Default | |
-|---|---|---|
-| `LLM_MODEL` | `qwen3:8b` | Must exist on the LLM server |
-| `EMBEDDING_MODEL` | `nomic-embed-text` | |
-| `EMBEDDING_DIM` | `768` | **Must match the model's real output size** — see §4 |
-| `EMBEDDING_DOCUMENT_PREFIX` | `search_document: ` | See §5 |
-| `EMBEDDING_QUERY_PREFIX` | `search_query: ` | See §5 |
-| `MIN_SCORE` | `0.55` | Calibrated for the default model — see §5 |
-| `TOP_K` | `5` | Passages per question |
-| `MAX_UPLOAD_MB` | `20` | |
-| `FRONTEND_PORT` / `BACKEND_PORT` | `3000` / `8000` | Host mappings |
-| `LLM_API_KEY` | *(empty)* | Only if your server demands a bearer token |
+| Variable                         | Default             |                                                      |
+| -------------------------------- | ------------------- | ---------------------------------------------------- |
+| `LLM_MODEL`                      | `qwen3:8b`          | Must exist on the LLM server                         |
+| `EMBEDDING_MODEL`                | `nomic-embed-text`  |                                                      |
+| `EMBEDDING_DIM`                  | `768`               | **Must match the model's real output size** — see §4 |
+| `EMBEDDING_DOCUMENT_PREFIX`      | `search_document: ` | See §5                                               |
+| `EMBEDDING_QUERY_PREFIX`         | `search_query: `    | See §5                                               |
+| `MIN_SCORE`                      | `0.55`              | Calibrated for the default model — see §5            |
+| `TOP_K`                          | `5`                 | Passages per question                                |
+| `MAX_UPLOAD_MB`                  | `20`                |                                                      |
+| `FRONTEND_PORT` / `BACKEND_PORT` | `3000` / `8000`     | Host mappings                                        |
+| `LLM_API_KEY`                    | _(empty)_           | Only if your server demands a bearer token           |
 
 `docker-compose.prod.yml` only forwards the variables it names. If you add a new
 setting to `.env.production` and nothing changes, check that it is listed in the
@@ -200,10 +200,10 @@ the top score of each. Set `MIN_SCORE` between the two clusters.
 
 For reference, measured on this repo's test corpus with `nomic-embed-text`:
 
-| | off-topic top score | on-topic top score |
-|---|---|---|
-| without prefixes | 0.35 – 0.51 | 0.48 – 0.64 (unusable, overlapping) |
-| with prefixes | 0.42 – 0.54 | 0.66 – 0.84 → floor of **0.55** |
+|                  | off-topic top score | on-topic top score                  |
+| ---------------- | ------------------- | ----------------------------------- |
+| without prefixes | 0.35 – 0.51         | 0.48 – 0.64 (unusable, overlapping) |
+| with prefixes    | 0.42 – 0.54         | 0.66 – 0.84 → floor of **0.55**     |
 
 Too high and good passages vanish. Too low and every question retrieves
 something, which defeats the point — the app answers "I don't know" precisely

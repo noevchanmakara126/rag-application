@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/chat/empty-state"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { readSSE } from "@/lib/stream"
-import { cn } from "@/lib/utils"
+import { cn, messageId } from "@/lib/utils"
 
 const TOP_K_CHOICES = [3, 5, 8]
 
@@ -50,7 +50,7 @@ export function ChatPanel() {
     const content = draft.trim()
     if (!content || busy) return
 
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", content }
+    const userMessage: ChatMessage = { id: messageId(), role: "user", content }
     const history = messages
       .filter((m) => !m.error)
       .map((m) => ({ role: m.role, content: m.content }))
@@ -102,9 +102,9 @@ export function ChatPanel() {
     setMessages((prev) => [
       ...prev,
       failure !== null && !text
-        ? { id: crypto.randomUUID(), role: "assistant", content: "", error: failure }
+        ? { id: messageId(), role: "assistant", content: "", error: failure }
         : {
-            id: crypto.randomUUID(),
+            id: messageId(),
             role: "assistant",
             content: text,
             sources: received,
